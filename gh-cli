@@ -1,3 +1,58 @@
 #!/usr/bin/env node
 
-console.log("hello");
+const https = require("node:https");
+require("dotenv").config();
+
+const GH_API_BASE_URL = "https://api.github.com";
+const TOKEN = process.env.GH_PAT;
+
+function ghRequest(token, path) {
+  const options = {
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${token}`,
+      "X-GitHub-Api-Version": "2022-11-28",
+      "User-Agent": "homework-gh-cli",
+    },
+  };
+
+  return new Promise((resolve, reject) => {
+    const req = https.get(`${GH_API_BASE_URL}${path}`, options, (res) => {
+      res.setEncoding("utf8");
+      let body = "";
+
+      res.on("data", (d) => {
+        body += d;
+      });
+
+      res.on("end", () => {
+        resolve(JSON.parse(body));
+      });
+
+      req.on("error", (err) => {
+        reject(err);
+      });
+
+      req.end();
+    });
+  });
+}
+
+(async () => {
+  try {
+    // 1. Get all repos for the ramda organization
+    // https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#list-organization-repositories
+    // TODO does not consider pagination, but in this scope doesn't need to as there are only 12 repos
+    const res = await ghRequest(TOKEN, "/orgs/ramda/repos");
+    if (!Array.isArray(res)) {
+      throw new Error("expected array, found: " + JSON.stringify(res));
+    }
+    res.forEach((repo) => {
+      process.stdout.write(repo.name + "\n");
+    });
+    // 2. Get all pull requests for all repos for the ramda organization
+    // TODO
+  } catch (e) {
+    process.stderr.write(e + "\n");
+  }
+})();

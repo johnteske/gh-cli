@@ -8,7 +8,7 @@ Retrieves every pull request from the Ramda GitHub organization for analysis.
 ### Requirements
 - make
 - docker
-- a GitHub personal access token
+- a `.env` file with the contents: `GH_PAT=<replace with a GitHub personal access token>`
 
 ### Development environment
 For ease of development, consistency, and eventual deployment, the app is built and run inside a container.

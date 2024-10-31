@@ -66,18 +66,17 @@ async function paginatedRequest(token, url, queryParams) {
     const { headers, body } = await ghRequest(token, nextUrl);
     data = [...data, ...body];
 
-    // exit early, for testing
-    if (data.length > MAX_RESULTS) {
-      nextUrl = null;
-      continue;
-    }
-
     const linkHeader = headers.link || "";
     const links = linkHeader.split(",");
     const next = links.find((l) => l.endsWith(`rel="next"`));
     if (next != null) {
       nextUrl = next.substring(next.indexOf("<") + 1, next.lastIndexOf(">"));
     } else {
+      nextUrl = null;
+    }
+
+    // exit early, for testing
+    if (data.length > MAX_RESULTS) {
       nextUrl = null;
     }
   }
@@ -116,12 +115,16 @@ async function getAllPullRequests(owner, repo) {
   try {
     const repos = await getRepos("ramda");
 
-    // TODO iterate through all
-    const pullRequests = await getAllPullRequests("ramda", repos[0].name);
+    let allPrs = [];
+    for (const repo of repos) {
+      const prs = await getAllPullRequests("ramda", repo.name);
+      allPrs = [...allPrs, ...prs];
+    }
 
     // TODO this is just example output
-    pullRequests.forEach((pr) => {
-      process.stdout.write(JSON.stringify(pr.title) + "\n");
+    allPrs.forEach((pr) => {
+      process.stdout.write(pr.title + "\n");
+      //process.stdout.write(JSON.stringify(pr) + "\n");
     });
   } catch (e) {
     process.stderr.write(e + "\n");

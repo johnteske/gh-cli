@@ -69,7 +69,7 @@ async function paginatedRequest(token, url, queryParams) {
     if (!Array.isArray(body)) {
       throw new Error("expected array, found: " + JSON.stringify(body));
     }
-    data = [...data, ...body];
+    data.push(...body);
 
     const linkHeader = headers.link || "";
     const links = linkHeader.split(",");
@@ -116,7 +116,7 @@ async function getAllPullRequests(owner, repo) {
     await Promise.all(
       repos.map(async (repo) => {
         const prs = await getAllPullRequests("ramda", repo.name);
-        allPrs = [...allPrs, ...prs];
+        allPrs.push(...prs);
       }),
     );
 

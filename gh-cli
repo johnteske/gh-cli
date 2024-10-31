@@ -66,6 +66,9 @@ async function paginatedRequest(token, url, queryParams) {
 
   while (nextUrl != null) {
     const { headers, body } = await ghRequest(token, nextUrl);
+    if (!Array.isArray(body)) {
+      throw new Error("expected array, found: " + JSON.stringify(body));
+    }
     data = [...data, ...body];
 
     const linkHeader = headers.link || "";
@@ -90,27 +93,18 @@ async function paginatedRequest(token, url, queryParams) {
 
 // https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#list-organization-repositories
 async function getRepos(org) {
-  const repos = await paginatedRequest(
+  return await paginatedRequest(
     TOKEN,
     ghApiUrl(`/orgs/${org}/repos`, { per_page: 100 }),
   );
-  if (!Array.isArray(repos)) {
-    throw new Error("expected array, found: " + JSON.stringify(repos));
-  }
-  return repos;
 }
 
 // https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#list-pull-requests
 async function getAllPullRequests(owner, repo) {
-  const prs = await paginatedRequest(
+  return await paginatedRequest(
     TOKEN,
     ghApiUrl(`/repos/${owner}/${repo}/pulls`, { per_page: 100, state: "all" }),
   );
-  if (!Array.isArray(prs)) {
-    throw new Error("expected array, found: " + JSON.stringify(prs));
-  }
-
-  return prs;
 }
 
 (async () => {

@@ -19,3 +19,23 @@ For ease of development, consistency, and eventual deployment, the app is built 
 ### Running the tool inside the container
 `npm install`: install dependencies
 `./gh-cli`: run the tool
+
+## Performance notes
+
+### For each repo (in series) fetching every PR (in series), best of 5
+```
+time ./gh-cli > /dev/null
+
+real	0m20.672s
+user	0m0.884s
+sys	0m0.216s
+```
+
+### For each repo (in parallel) fetching every PR (in series), best of 5
+```
+time ./gh-cli > /dev/null
+
+real	0m14.777s
+user	0m0.844s
+sys	0m0.219s
+```

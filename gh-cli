@@ -5,7 +5,9 @@ const querystring = require("node:querystring");
 const { program } = require("commander");
 require("dotenv").config();
 
-const MAX_RESULTS = 111;
+// set to a positive, non-zero value to limit results
+const MAX_RESULTS = -1;
+
 const TOKEN = process.env.GH_PAT;
 
 program.option("-v, --verbose", "print addtional information for debugging");
@@ -76,7 +78,7 @@ async function paginatedRequest(token, url, queryParams) {
     }
 
     // exit early, for testing
-    if (data.length > MAX_RESULTS) {
+    if (MAX_RESULTS > 0 && data.length > MAX_RESULTS) {
       nextUrl = null;
     }
   }
@@ -116,16 +118,21 @@ async function getAllPullRequests(owner, repo) {
     const repos = await getRepos("ramda");
 
     let allPrs = [];
-    for (const repo of repos) {
-      const prs = await getAllPullRequests("ramda", repo.name);
-      allPrs = [...allPrs, ...prs];
-    }
+
+    await Promise.all(
+      repos.map(async (repo) => {
+        const prs = await getAllPullRequests("ramda", repo.name);
+        allPrs = [...allPrs, ...prs];
+      }),
+    );
 
     // TODO this is just example output
     allPrs.forEach((pr) => {
       process.stdout.write(pr.title + "\n");
       //process.stdout.write(JSON.stringify(pr) + "\n");
     });
+
+    debug({ totalPrs: allPrs.length });
   } catch (e) {
     process.stderr.write(e + "\n");
   }

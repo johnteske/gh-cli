@@ -1,12 +1,29 @@
 #!/usr/bin/env node
 
 const https = require("node:https");
+const querystring = require("node:querystring");
+const { program } = require("commander");
 require("dotenv").config();
 
-const GH_API_BASE_URL = "https://api.github.com";
+const MAX_RESULTS = 111;
 const TOKEN = process.env.GH_PAT;
 
-function ghRequest(token, path) {
+program.option("-v, --verbose", "print addtional information for debugging");
+program.parse(process.argv);
+const options = program.opts();
+
+function debug(obj) {
+  if (options.verbose) {
+    process.stdout.write(JSON.stringify(obj) + "\n");
+  }
+}
+
+function ghApiUrl(url, queryParams) {
+  const queryString = querystring.stringify(queryParams);
+  return `https://api.github.com${url}?${queryString}`;
+}
+
+function ghRequest(token, url) {
   const options = {
     headers: {
       Accept: "application/vnd.github+json",
@@ -17,8 +34,11 @@ function ghRequest(token, path) {
   };
 
   return new Promise((resolve, reject) => {
-    const req = https.get(`${GH_API_BASE_URL}${path}`, options, (res) => {
+    const req = https.get(url, options, (res) => {
       res.setEncoding("utf8");
+      debug({ url, statusCode: res.statusCode });
+
+      const { headers } = res;
       let body = "";
 
       res.on("data", (d) => {
@@ -26,7 +46,7 @@ function ghRequest(token, path) {
       });
 
       res.on("end", () => {
-        resolve(JSON.parse(body));
+        resolve({ headers, body: JSON.parse(body) });
       });
 
       req.on("error", (err) => {
@@ -38,20 +58,71 @@ function ghRequest(token, path) {
   });
 }
 
+async function paginatedRequest(token, url, queryParams) {
+  let nextUrl = url;
+  let data = [];
+
+  while (nextUrl != null) {
+    const { headers, body } = await ghRequest(token, nextUrl);
+    data = [...data, ...body];
+
+    // exit early, for testing
+    if (data.length > MAX_RESULTS) {
+      nextUrl = null;
+      continue;
+    }
+
+    const linkHeader = headers.link || "";
+    const links = linkHeader.split(",");
+    const next = links.find((l) => l.endsWith(`rel="next"`));
+    if (next != null) {
+      nextUrl = next.substring(next.indexOf("<") + 1, next.lastIndexOf(">"));
+    } else {
+      nextUrl = null;
+    }
+  }
+
+  debug({ status: "done", url, length: data.length });
+
+  return data;
+}
+
+// https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#list-organization-repositories
+async function getRepos(org) {
+  const repos = await paginatedRequest(
+    TOKEN,
+    ghApiUrl(`/orgs/${org}/repos`, { per_page: 100 }),
+  );
+  if (!Array.isArray(repos)) {
+    throw new Error("expected array, found: " + JSON.stringify(repos));
+  }
+  return repos;
+}
+
+// https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#list-pull-requests
+async function getAllPullRequests(owner, repo) {
+  const prs = await paginatedRequest(
+    TOKEN,
+    ghApiUrl(`/repos/${owner}/${repo}/pulls`, { per_page: 100, state: "all" }),
+  );
+  if (!Array.isArray(prs)) {
+    throw new Error("expected array, found: " + JSON.stringify(prs));
+  }
+
+  return prs;
+}
+
 (async () => {
   try {
-    // 1. Get all repos for the ramda organization
-    // https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#list-organization-repositories
-    // TODO does not consider pagination, but in this scope doesn't need to as there are only 12 repos
-    const res = await ghRequest(TOKEN, "/orgs/ramda/repos");
-    if (!Array.isArray(res)) {
-      throw new Error("expected array, found: " + JSON.stringify(res));
-    }
-    res.forEach((repo) => {
-      process.stdout.write(repo.name + "\n");
+    const repos = await getRepos("ramda");
+
+    // TODO iterate through all
+    const pullRequests = await getAllPullRequests("ramda", repos[0].name);
+
+    // TODO this is just example output
+    pullRequests.forEach((pr) => {
+      process.stdout.write(JSON.stringify(pr.title) + "\n");
     });
-    // 2. Get all pull requests for all repos for the ramda organization
-    // TODO
   } catch (e) {
     process.stderr.write(e + "\n");
   }

@@ -14,17 +14,33 @@ program.option("-v, --verbose", "print addtional information for debugging");
 program.parse(process.argv);
 const options = program.opts();
 
+/**
+ * Print the input as JSON, if the verbose option is on
+ * @param {object} obj
+ */
 function debug(obj) {
   if (options.verbose) {
     process.stdout.write(JSON.stringify(obj) + "\n");
   }
 }
 
+/**
+ * Format a URL for calling the GitHub API
+ * @param {string} url
+ * @param {Object.<string, string>} queryParams
+ * @returns {string}
+ */
 function ghApiUrl(url, queryParams) {
   const queryString = querystring.stringify(queryParams);
   return `https://api.github.com${url}?${queryString}`;
 }
 
+/**
+ * Makes an authenticated GET request to the provided URL, with the recommended GitHub API headers
+ * @param {string} token - GitHub personal access token
+ * @param {string} url
+ * @returns {Object[]}
+ */
 function ghRequest(token, url) {
   const options = {
     headers: {
@@ -60,7 +76,13 @@ function ghRequest(token, url) {
   });
 }
 
-async function paginatedRequest(token, url, queryParams) {
+/**
+ * Makes a series of requests to get all pages for a GitHub resource
+ * @param {string} token - GitHub personal access token
+ * @param {string} url
+ * @returns {Object[]}
+ */
+async function paginatedRequest(token, url) {
   let nextUrl = url;
   let data = [];
 
@@ -91,7 +113,11 @@ async function paginatedRequest(token, url, queryParams) {
   return data;
 }
 
-// https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#list-organization-repositories
+/**
+ * Get all repositories for the given GitHub organziation
+ * @see https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#list-organization-repositories
+ * @param {string} org
+ */
 async function getRepos(org) {
   return await paginatedRequest(
     TOKEN,
@@ -99,12 +125,28 @@ async function getRepos(org) {
   );
 }
 
-// https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#list-pull-requests
+/**
+ * Get all repositories for the given GitHub organziation
+ * @see https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#list-pull-requests
+ * @param {string} owner
+ * @param {string} repo - repository name
+ */
 async function getAllPullRequests(owner, repo) {
   return await paginatedRequest(
     TOKEN,
     ghApiUrl(`/repos/${owner}/${repo}/pulls`, { per_page: 100, state: "all" }),
   );
+}
+
+/**
+ * Perform analysis on a collection of pull requests
+ * @param {Object[]} prs
+ */
+function analyze(prs) {
+  prs.forEach((pr) => {
+    process.stdout.write(pr.title + "\n");
+    //process.stdout.write(JSON.stringify(pr) + "\n");
+  });
 }
 
 (async () => {
@@ -120,13 +162,9 @@ async function getAllPullRequests(owner, repo) {
       }),
     );
 
-    // TODO this is just example output
-    allPrs.forEach((pr) => {
-      process.stdout.write(pr.title + "\n");
-      //process.stdout.write(JSON.stringify(pr) + "\n");
-    });
-
     debug({ totalPrs: allPrs.length });
+
+    analyze(allPrs);
   } catch (e) {
     process.stderr.write(e + "\n");
   }

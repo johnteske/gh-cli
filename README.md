@@ -39,3 +39,11 @@ real	0m14.777s
 user	0m0.844s
 sys	0m0.219s
 ```
+
+## Next steps
+### Business logic
+- adjust processing of array and output to query requirements
+### Technical
+- add tests, especially for filtering/processing
+- add linting
+- replace hard-coded MAX_RESULTS with a command-line option
